@@ -59,6 +59,19 @@ export class ContaminationCalculator {
     return currentLevel;
   }
 
+  static growContamination(currentLevel, cargo, leadShieldingLevel, dt) {
+    if (leadShieldingLevel > 0) return currentLevel;
+    if (cargo.uranium <= 0) return currentLevel;
+    
+    const totalOres = Object.values(cargo).reduce((sum, count) => sum + count, 0);
+    if (totalOres <= 0) return currentLevel;
+
+    const uraniumRatio = cargo.uranium / totalOres;
+    const growthAmount = RADIATION.CARGO_CONTAMINATION_GROWTH_RATE * uraniumRatio * dt;
+    
+    return Math.min(1, currentLevel + growthAmount);
+  }
+
   static calcOreValuePenalty(baseValue, contaminationLevel, leadShieldingLevel) {
     if (leadShieldingLevel > 0) return baseValue;
     const factor = 1 - contaminationLevel * 0.5;
@@ -132,6 +145,13 @@ export class RadiationManager {
 
   applyCargoRadiation(dt, player) {
     if (player.cargo.uranium <= 0 || player.leadShieldingLevel > 0) return 0;
+
+    player.contaminationLevel = ContaminationCalculator.growContamination(
+      player.contaminationLevel,
+      player.cargo,
+      player.leadShieldingLevel,
+      dt
+    );
 
     const dps = ContaminationCalculator.calcCargoDps(
       player.contaminationLevel,

@@ -120,10 +120,63 @@ describe('ContaminationCalculator', () => {
     expect(ContaminationCalculator.calcCargoDps(0.5, 1)).toBe(0);
   });
 
-  it('低污染时DPS非常低', () => {
+  it('低污染时DPS非常低，几乎可忽略', () => {
     const dps = ContaminationCalculator.calcCargoDps(0, 0);
     const minExpected = RADIATION.CARGO_BASE_DPS * RADIATION.CARGO_MIN_RATIO;
     expect(dps).toBeCloseTo(minExpected, 2);
+    expect(dps).toBeLessThan(0.01);
+  });
+
+  it('高污染与低污染DPS差距显著', () => {
+    const lowDps = ContaminationCalculator.calcCargoDps(0.01, 0);
+    const highDps = ContaminationCalculator.calcCargoDps(0.99, 0);
+    expect(highDps).toBeGreaterThan(lowDps * 10);
+  });
+
+  it('growContamination有铅衬时不增长', () => {
+    const cargo = { uranium: 5, coal: 10 };
+    const result = ContaminationCalculator.growContamination(0.5, cargo, 1, 10);
+    expect(result).toBe(0.5);
+  });
+
+  it('growContamination无铀矿时不增长', () => {
+    const cargo = { uranium: 0, coal: 10 };
+    const result = ContaminationCalculator.growContamination(0.5, cargo, 0, 10);
+    expect(result).toBe(0.5);
+  });
+
+  it('growContamination有铀矿时随时间增长', () => {
+    const cargo = { uranium: 5, coal: 5 };
+    let level = 0;
+    for (let i = 0; i < 10; i++) {
+      level = ContaminationCalculator.growContamination(level, cargo, 0, 1);
+    }
+    expect(level).toBeGreaterThan(0);
+    expect(level).toBeLessThanOrEqual(1);
+  });
+
+  it('growContamination铀矿比例越高增长越快', () => {
+    const cargoLowUranium = { uranium: 1, coal: 9 };
+    const cargoHighUranium = { uranium: 9, coal: 1 };
+    
+    let levelLow = 0;
+    let levelHigh = 0;
+    for (let i = 0; i < 10; i++) {
+      levelLow = ContaminationCalculator.growContamination(levelLow, cargoLowUranium, 0, 1);
+      levelHigh = ContaminationCalculator.growContamination(levelHigh, cargoHighUranium, 0, 1);
+    }
+    
+    expect(levelHigh).toBeGreaterThan(levelLow);
+  });
+
+  it('growContamination不会超过1', () => {
+    const cargo = { uranium: 5, coal: 5 };
+    let level = 0.99;
+    for (let i = 0; i < 100; i++) {
+      level = ContaminationCalculator.growContamination(level, cargo, 0, 1);
+    }
+    expect(level).toBeLessThanOrEqual(1);
+    expect(level).toBeGreaterThan(0.99);
   });
 });
 
@@ -264,6 +317,64 @@ describe('RadiationManager', () => {
     const damage = rm.applyCargoRadiation(1, mockPlayer);
     expect(damage).toBeGreaterThan(0);
     expect(totalDamage).toBeGreaterThan(0);
+  });
+
+  it('applyCargoRadiation有铀矿无铅衬时污染会增长', () => {
+    mockPlayer.cargo = { uranium: 3, coal: 5 };
+    mockPlayer.leadShieldingLevel = 0;
+    mockPlayer.contaminationLevel = 0;
+    mockPlayer.takeRadiationDamage = () => {};
+
+    const startLevel = mockPlayer.contaminationLevel;
+    rm.applyCargoRadiation(10, mockPlayer);
+    expect(mockPlayer.contaminationLevel).toBeGreaterThan(startLevel);
+  });
+
+  it('applyCargoRadiation低污染时伤害很轻，高污染时危险', () => {
+    mockPlayer.cargo = { uranium: 5, coal: 5 };
+    mockPlayer.leadShieldingLevel = 0;
+    mockPlayer.takeRadiationDamage = () => {};
+
+    mockPlayer.contaminationLevel = 0;
+    const lowDamage = rm.applyCargoRadiation(1, mockPlayer);
+    const lowLevel = mockPlayer.contaminationLevel;
+    
+    mockPlayer.contaminationLevel = 0.95;
+    const highDamage = rm.applyCargoRadiation(1, mockPlayer);
+    
+    expect(lowDamage).toBeLessThan(0.01);
+    expect(highDamage).toBeGreaterThan(0.2);
+    expect(highDamage).toBeGreaterThan(lowDamage * 20);
+  });
+
+  it('applyCargoRadiation随时间流逝污染逐渐加重，伤害逐渐升高', () => {
+    mockPlayer.cargo = { uranium: 5, coal: 5 };
+    mockPlayer.leadShieldingLevel = 0;
+    mockPlayer.contaminationLevel = 0;
+    
+    let lastDamage = 0;
+    let damages = [];
+    
+    for (let i = 0; i < 60; i++) {
+      mockPlayer.takeRadiationDamage = () => {};
+      const damage = rm.applyCargoRadiation(1, mockPlayer);
+      damages.push(damage);
+      lastDamage = damage;
+    }
+    
+    expect(mockPlayer.contaminationLevel).toBeGreaterThan(0.5);
+    expect(damages[59]).toBeGreaterThan(damages[0] * 10);
+    expect(lastDamage).toBeGreaterThan(0.1);
+  });
+
+  it('applyCargoRadiation有铅衬时不会增长污染', () => {
+    mockPlayer.cargo = { uranium: 3, coal: 5 };
+    mockPlayer.leadShieldingLevel = 1;
+    mockPlayer.contaminationLevel = 0.5;
+    mockPlayer.takeRadiationDamage = () => {};
+
+    rm.applyCargoRadiation(10, mockPlayer);
+    expect(mockPlayer.contaminationLevel).toBe(0.5);
   });
 
   it('applyCargoRadiation有铅衬时不造成伤害', () => {
