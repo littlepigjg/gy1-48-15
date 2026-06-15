@@ -1,4 +1,4 @@
-import { TILE_SIZE, WORLD_WIDTH, SURFACE_Y, UPGRADE_DEFS, TILE_TYPES } from './constants.js';
+import { TILE_SIZE, WORLD_WIDTH, SURFACE_Y, UPGRADE_DEFS, TILE_TYPES, RADIATION } from './constants.js';
 
 export class Player {
   constructor(startX, startY) {
@@ -17,10 +17,12 @@ export class Player {
       engine: 0,
       drill: 0,
       cargo: 0,
+      lead_shielding: 0,
       fuel_tank: 0,
       oxygen_tank: 0,
       cooling: 0,
       armor: 0,
+      hazmat_suit: 0,
       weapon: 0
     };
 
@@ -42,6 +44,8 @@ export class Player {
     this.fuelConsumption = 0.03 - this.upgrades.engine * 0.004;
     this.oxygenConsumption = 0.02;
     this.damageReduction = this.upgrades.armor * 0.1;
+    this.radiationResistance = this.upgrades.hazmat_suit * RADIATION.HAZMAT_REDUCTION_PER_LEVEL;
+    this.leadShieldingLevel = this.upgrades.lead_shielding;
     this.weaponDamage = 10 + this.upgrades.weapon * 8;
     this.weaponCooldown = Math.max(150, 500 - this.upgrades.weapon * 70);
     this.lastShot = 0;
@@ -53,8 +57,10 @@ export class Player {
       gold: 0,
       emerald: 0,
       ruby: 0,
-      diamond: 0
+      diamond: 0,
+      uranium: 0
     };
+    this.contaminationLevel = 0;
 
     this.maxDepth = 0;
     this.damageFlash = 0;
@@ -79,6 +85,8 @@ export class Player {
     this.coolingRate = 0.08 + this.upgrades.cooling * 0.03;
     this.fuelConsumption = 0.03 - this.upgrades.engine * 0.004;
     this.damageReduction = this.upgrades.armor * 0.1;
+    this.radiationResistance = this.upgrades.hazmat_suit * RADIATION.HAZMAT_REDUCTION_PER_LEVEL;
+    this.leadShieldingLevel = this.upgrades.lead_shielding;
     this.weaponDamage = 10 + this.upgrades.weapon * 8;
     this.weaponCooldown = Math.max(150, 500 - this.upgrades.weapon * 70);
 
@@ -108,16 +116,42 @@ export class Player {
 
   addOre(oreType) {
     if (this.cargoUsed >= this.maxCargo) return false;
+    
+    if (oreType === 'uranium' && this.leadShieldingLevel === 0) {
+      const totalOtherOres = this.cargoUsed - this.cargo.uranium;
+      if (totalOtherOres > 0) {
+        this.contaminationLevel = Math.min(1, this.contaminationLevel + RADIATION.CARGO_CONTAMINATION_RATE);
+      }
+    }
+    
+    if (oreType !== 'uranium' && this.cargo.uranium > 0 && this.leadShieldingLevel === 0) {
+      this.contaminationLevel = Math.min(1, this.contaminationLevel + RADIATION.CARGO_CONTAMINATION_RATE);
+    }
+    
     this.cargo[oreType]++;
     this.cargoUsed++;
     return true;
   }
 
+  getContaminatedOreValue(baseValue) {
+    if (this.leadShieldingLevel > 0) return baseValue;
+    const contaminationFactor = 1 - this.contaminationLevel * 0.5;
+    return Math.floor(baseValue * contaminationFactor);
+  }
+
+  clearContamination() {
+    this.contaminationLevel = 0;
+  }
+
   sellOres(prices, depthBonusMultiplier = 1) {
     let total = 0;
     let bonus = 0;
+    let contaminationPenalty = 0;
     for (const [type, count] of Object.entries(this.cargo)) {
-      const baseValue = count * prices[type];
+      let baseValue = count * prices[type];
+      if (type !== 'uranium') {
+        baseValue = this.getContaminatedOreValue(baseValue);
+      }
       total += baseValue;
       bonus += baseValue * (depthBonusMultiplier - 1);
       this.cargo[type] = 0;
@@ -125,23 +159,38 @@ export class Player {
     const finalTotal = Math.floor(total + bonus);
     this.gold += finalTotal;
     this.cargoUsed = 0;
-    return { total: finalTotal, base: Math.floor(total), bonus: Math.floor(bonus) };
+    this.clearContamination();
+    return { total: finalTotal, base: Math.floor(total), bonus: Math.floor(bonus), contamination: Math.floor(contaminationPenalty) };
   }
 
   sellOre(type, prices, depthBonusMultiplier = 1) {
     const count = this.cargo[type];
     if (count <= 0) return { total: 0, base: 0, bonus: 0 };
-    const baseValue = count * prices[type];
+    let baseValue = count * prices[type];
+    if (type !== 'uranium') {
+      baseValue = this.getContaminatedOreValue(baseValue);
+    }
     const bonus = baseValue * (depthBonusMultiplier - 1);
     const finalValue = Math.floor(baseValue + bonus);
     this.gold += finalValue;
     this.cargoUsed -= count;
     this.cargo[type] = 0;
+    if (this.cargo.uranium === 0) {
+      this.clearContamination();
+    }
     return { total: finalValue, base: Math.floor(baseValue), bonus: Math.floor(bonus) };
   }
 
   takeDamage(amount) {
     const reduced = amount * (1 - this.damageReduction);
+    this.health -= reduced;
+    this.damageFlash = 0.5;
+    if (this.health < 0) this.health = 0;
+    return reduced;
+  }
+
+  takeRadiationDamage(amount) {
+    const reduced = amount * (1 - this.radiationResistance);
     this.health -= reduced;
     this.damageFlash = 0.5;
     if (this.health < 0) this.health = 0;

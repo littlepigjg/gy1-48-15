@@ -77,7 +77,8 @@ export class EnemyManager {
       height: TILE_SIZE * stats.size,
       damageFlash: 0,
       aiTimer: 0,
-      aiDir: { x: 0, y: 0 }
+      aiDir: { x: 0, y: 0 },
+      mutated: false
     };
   }
 

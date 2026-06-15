@@ -248,12 +248,29 @@ export class Game {
         if (Math.random() < 0.2) {
           this.particles.spawnTrail(this.player.x, this.player.y, '#7CFC00');
         }
+      } else if (type === 'radiation') {
+        this.player.takeRadiationDamage(damage);
+        if (Math.random() < 0.3) {
+          this.particles.spawnTrail(this.player.x, this.player.y, '#39FF14');
+        }
       }
-    });
+    }, this.enemies.enemies);
     this.checkHazards(dt);
     this.checkCollapses(dt);
     this.checkEnemyKills();
     this.checkLowResources();
+    this.checkCargoRadiation(dt);
+  }
+
+  checkCargoRadiation(dt) {
+    if (this.player.cargo.uranium > 0 && this.player.leadShieldingLevel === 0) {
+      const radiationDamage = 0.5 * dt * 60;
+      this.player.takeRadiationDamage(radiationDamage * 0.1);
+      
+      if (this.player.contaminationLevel > 0.5 && Math.random() < 0.01) {
+        this.ui.showWarning('☢️ 货仓辐射泄漏！正在伤害你', 1500, 'text-green-400');
+      }
+    }
   }
 
   handleDigging(dt) {
@@ -318,6 +335,18 @@ export class Game {
         if (result.hazard === 'instability') {
           this.hazards.addCollapseWarning(target.x, target.y);
           setTimeout(() => this.triggerCollapse(target.x, target.y), 1000);
+        }
+
+        if (result.hazard === 'radiation') {
+          this.hazards.spawnRadiationField(
+            target.x * TILE_SIZE + TILE_SIZE / 2,
+            target.y * TILE_SIZE + TILE_SIZE / 2
+          );
+          if (this.player.leadShieldingLevel === 0) {
+            this.ui.showWarning('☢️ 警告！铀矿石产生辐射场！建议安装铅衬货仓', 3000, 'text-green-400');
+          } else {
+            this.ui.showWarning('☢️ 采集到铀矿石！铅衬货仓已隔离辐射', 2000, 'text-cyan-400');
+          }
         }
 
         this.player.fuel -= this.player.fuelConsumption * 0.5 * dt * 60;
@@ -396,7 +425,8 @@ export class Game {
       gold: '#FFD700',
       emerald: '#50C878',
       ruby: '#E0115F',
-      diamond: '#00CED1'
+      diamond: '#00CED1',
+      uranium: '#39FF14'
     };
     return colorMap[oreType] || '#FFFFFF';
   }

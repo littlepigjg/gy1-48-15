@@ -16,6 +16,7 @@ export const TILE_TYPES = {
   ORE_EMERALD: 13,
   ORE_RUBY: 14,
   ORE_DIAMOND: 15,
+  ORE_URANIUM: 16,
   CAVE: 20,
   POISON_GAS: 21,
   INSTABILITY: 22
@@ -34,6 +35,7 @@ export const TILE_COLORS = {
   [TILE_TYPES.ORE_EMERALD]: ['#50C878', '#3CB371', '#98FB98'],
   [TILE_TYPES.ORE_RUBY]: ['#E0115F', '#DC143C', '#FF69B4'],
   [TILE_TYPES.ORE_DIAMOND]: ['#00CED1', '#40E0D0', '#AFEEEE'],
+  [TILE_TYPES.ORE_URANIUM]: ['#39FF14', '#00FF00', '#7FFF00'],
   [TILE_TYPES.CAVE]: null,
   [TILE_TYPES.POISON_GAS]: ['#7CFC00', '#90EE90', '#32CD32'],
   [TILE_TYPES.INSTABILITY]: ['#8B0000', '#8B008B', '#FF8C00']
@@ -52,6 +54,7 @@ export const TILE_HARDNESS = {
   [TILE_TYPES.ORE_EMERALD]: 4,
   [TILE_TYPES.ORE_RUBY]: 4,
   [TILE_TYPES.ORE_DIAMOND]: 5,
+  [TILE_TYPES.ORE_URANIUM]: 6,
   [TILE_TYPES.CAVE]: 0,
   [TILE_TYPES.POISON_GAS]: 1,
   [TILE_TYPES.INSTABILITY]: 2
@@ -63,7 +66,8 @@ export const ORE_PRICES = {
   gold: 50,
   emerald: 100,
   ruby: 150,
-  diamond: 300
+  diamond: 300,
+  uranium: 500
 };
 
 export const ORE_NAMES = {
@@ -72,7 +76,8 @@ export const ORE_NAMES = {
   gold: '金矿',
   emerald: '祖母绿',
   ruby: '红宝石',
-  diamond: '钻石'
+  diamond: '钻石',
+  uranium: '铀矿石'
 };
 
 export const TILE_ORE_MAP = {
@@ -81,7 +86,8 @@ export const TILE_ORE_MAP = {
   [TILE_TYPES.ORE_GOLD]: 'gold',
   [TILE_TYPES.ORE_EMERALD]: 'emerald',
   [TILE_TYPES.ORE_RUBY]: 'ruby',
-  [TILE_TYPES.ORE_DIAMOND]: 'diamond'
+  [TILE_TYPES.ORE_DIAMOND]: 'diamond',
+  [TILE_TYPES.ORE_URANIUM]: 'uranium'
 };
 
 export const UPGRADE_DEFS = {
@@ -105,6 +111,13 @@ export const UPGRADE_DEFS = {
     description: '增加货仓容量',
     maxLevel: 5,
     costs: [150, 400, 1000, 2500, 6000]
+  },
+  lead_shielding: {
+    name: '铅衬货仓',
+    icon: '☢️',
+    description: '隔离辐射，防止铀矿石污染其他矿石',
+    maxLevel: 3,
+    costs: [1000, 3000, 8000]
   },
   fuel_tank: {
     name: '燃料罐',
@@ -134,6 +147,13 @@ export const UPGRADE_DEFS = {
     maxLevel: 5,
     costs: [250, 600, 1500, 4000, 10000]
   },
+  hazmat_suit: {
+    name: '防辐射装甲',
+    icon: '🟢',
+    description: '减少辐射伤害，辐射防护等级',
+    maxLevel: 5,
+    costs: [500, 1500, 4000, 10000, 25000]
+  },
   weapon: {
     name: '武器系统',
     icon: '⚔️',
@@ -141,6 +161,16 @@ export const UPGRADE_DEFS = {
     maxLevel: 5,
     costs: [350, 800, 2000, 5000, 12000]
   }
+};
+
+export const RADIATION = {
+  DAMAGE_PER_TICK: 2,
+  TICK_INTERVAL: 1.0,
+  RADIUS: 3,
+  FIELD_DURATION: 30,
+  CARGO_CONTAMINATION_RATE: 0.1,
+  MIN_DEPTH: 400,
+  HAZMAT_REDUCTION_PER_LEVEL: 0.15
 };
 
 export const DEPTH_BONUS_MULTIPLIER = 0.003;

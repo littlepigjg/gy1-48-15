@@ -94,6 +94,16 @@ export class UIManager {
     document.getElementById('oreCoal').textContent = p.cargo.coal;
     document.getElementById('oreEmerald').textContent = p.cargo.emerald;
     document.getElementById('oreRuby').textContent = p.cargo.ruby;
+    document.getElementById('oreUranium').textContent = p.cargo.uranium;
+
+    const contaminationEl = document.getElementById('contaminationLevel');
+    if (p.contaminationLevel > 0 && p.leadShieldingLevel === 0) {
+      contaminationEl.classList.remove('hidden');
+      const contaminationPct = Math.floor(p.contaminationLevel * 100);
+      document.getElementById('contaminationText').textContent = `☢️ 污染: ${contaminationPct}%`;
+    } else {
+      contaminationEl.classList.add('hidden');
+    }
 
     this.updateTeleportUI();
     this.checkWarnings();
@@ -160,6 +170,7 @@ export class UIManager {
     if (p.heat > p.maxHeat * 0.8) warnings.push('⚠️ 温度过高！');
     if (p.health < p.maxHealth * 0.2) warnings.push('⚠️ 机身受损严重！');
     if (p.cargoUsed >= p.maxCargo) warnings.push('📦 货仓已满！');
+    if (p.cargo.uranium > 0 && p.leadShieldingLevel === 0) warnings.push('☢️ 铀矿石辐射中！');
 
     const msg = warnings.join('  ');
     if (msg && !this.warningTimeout) {
@@ -268,7 +279,8 @@ export class UIManager {
       gold: '🪙',
       emerald: '💚',
       ruby: '❤️',
-      diamond: '💎'
+      diamond: '💎',
+      uranium: '☢️'
     };
     return icons[type] || '🪨';
   }

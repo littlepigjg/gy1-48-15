@@ -150,15 +150,16 @@ export class World {
       if (r < 0.75) return TILE_TYPES.ORE_EMERALD;
       if (r < 0.9) return TILE_TYPES.ORE_RUBY;
       return TILE_TYPES.ORE_DIAMOND;
-    } else if (depthRatio < 0.8) {
+    } else if (depthRatio < 0.833) {
       if (r < 0.15) return TILE_TYPES.ORE_GOLD;
       if (r < 0.35) return TILE_TYPES.ORE_EMERALD;
       if (r < 0.6) return TILE_TYPES.ORE_RUBY;
       return TILE_TYPES.ORE_DIAMOND;
     } else {
-      if (r < 0.1) return TILE_TYPES.ORE_EMERALD;
-      if (r < 0.4) return TILE_TYPES.ORE_RUBY;
-      return TILE_TYPES.ORE_DIAMOND;
+      if (r < 0.08) return TILE_TYPES.ORE_EMERALD;
+      if (r < 0.25) return TILE_TYPES.ORE_RUBY;
+      if (r < 0.6) return TILE_TYPES.ORE_DIAMOND;
+      return TILE_TYPES.ORE_URANIUM;
     }
   }
 
@@ -197,6 +198,7 @@ export class World {
   getHazardEffect(tile) {
     if (tile === TILE_TYPES.POISON_GAS) return 'poison';
     if (tile === TILE_TYPES.INSTABILITY) return 'instability';
+    if (tile === TILE_TYPES.ORE_URANIUM) return 'radiation';
     return null;
   }
 

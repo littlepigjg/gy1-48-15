@@ -1,4 +1,4 @@
-import { TILE_SIZE, TILE_TYPES } from './constants.js';
+import { TILE_SIZE, TILE_TYPES, RADIATION } from './constants.js';
 
 export class PoisonGasCloud {
   constructor(x, y, tileX, tileY, index = 0, total = 5) {
@@ -51,9 +51,51 @@ export class PoisonGasCloud {
   }
 }
 
+export class RadiationField {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.tileX = Math.floor(x / TILE_SIZE);
+    this.tileY = Math.floor(y / TILE_SIZE);
+    this.radius = RADIATION.RADIUS * TILE_SIZE;
+    this.maxLife = RADIATION.FIELD_DURATION;
+    this.life = this.maxLife;
+    this.pulsePhase = Math.random() * Math.PI * 2;
+    this.damageTimer = 0;
+  }
+
+  update(dt) {
+    this.life -= dt;
+    this.pulsePhase += dt * 3;
+    this.damageTimer += dt;
+    return this.life > 0;
+  }
+
+  shouldDamage() {
+    if (this.damageTimer >= RADIATION.TICK_INTERVAL) {
+      this.damageTimer = 0;
+      return true;
+    }
+    return false;
+  }
+
+  getDamageIntensity(entityX, entityY) {
+    const dx = entityX - this.x;
+    const dy = entityY - this.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > this.radius) return 0;
+    return 1 - dist / this.radius;
+  }
+
+  isAlive() {
+    return this.life > 0;
+  }
+}
+
 export class HazardManager {
   constructor() {
     this.poisonClouds = [];
+    this.radiationFields = [];
     this.collapseWarnings = [];
     this.damageTimer = 0;
     this.damageInterval = 0.6;
@@ -72,6 +114,10 @@ export class HazardManager {
     }
   }
 
+  spawnRadiationField(x, y) {
+    this.radiationFields.push(new RadiationField(x, y));
+  }
+
   addCollapseWarning(tileX, tileY) {
     this.collapseWarnings.push({
       tileX,
@@ -81,7 +127,7 @@ export class HazardManager {
     });
   }
 
-  update(dt, world, player, onDamage) {
+  update(dt, world, player, onDamage, enemies = null) {
     const clouds = this.poisonClouds;
 
     for (let i = clouds.length - 1; i >= 0; i--) {
@@ -115,6 +161,43 @@ export class HazardManager {
       if (!cloud.update(dt, world)) {
         clouds.splice(i, 1);
         continue;
+      }
+    }
+
+    for (let i = this.radiationFields.length - 1; i >= 0; i--) {
+      const field = this.radiationFields[i];
+      if (!field.update(dt)) {
+        this.radiationFields.splice(i, 1);
+        continue;
+      }
+
+      if (field.shouldDamage()) {
+        const playerIntensity = field.getDamageIntensity(player.x, player.y);
+        if (playerIntensity > 0) {
+          const damage = RADIATION.DAMAGE_PER_TICK * playerIntensity;
+          onDamage('radiation', damage);
+        }
+
+        if (enemies) {
+          for (const enemy of enemies) {
+            const enemyIntensity = field.getDamageIntensity(enemy.x, enemy.y);
+            if (enemyIntensity > 0) {
+              const damage = RADIATION.DAMAGE_PER_TICK * enemyIntensity * 1.5;
+              enemy.health -= damage;
+              enemy.damageFlash = 0.2;
+              
+              if (Math.random() < 0.02 && !enemy.mutated) {
+                enemy.mutated = true;
+                enemy.health = enemy.maxHealth * 1.5;
+                enemy.maxHealth = enemy.maxHealth * 1.5;
+                enemy.damage = enemy.damage * 1.3;
+                enemy.speed = enemy.speed * 1.2;
+                enemy.gold = Math.floor(enemy.gold * 1.5);
+                enemy.color = '#00FF00';
+              }
+            }
+          }
+        }
       }
     }
 
@@ -157,6 +240,49 @@ export class HazardManager {
   }
 
   render(ctx, worldToScreen) {
+    for (const field of this.radiationFields) {
+      const screen = worldToScreen(field.x, field.y);
+      const alpha = Math.min(0.35, (field.life / field.maxLife) * 0.4);
+      const pulse = 1 + Math.sin(field.pulsePhase) * 0.15;
+      const size = field.radius * pulse;
+
+      const gradient = ctx.createRadialGradient(
+        screen.x, screen.y, 0,
+        screen.x, screen.y, size
+      );
+      gradient.addColorStop(0, `rgba(57, 255, 20, ${alpha})`);
+      gradient.addColorStop(0.4, `rgba(0, 255, 0, ${alpha * 0.7})`);
+      gradient.addColorStop(0.7, `rgba(127, 255, 0, ${alpha * 0.4})`);
+      gradient.addColorStop(1, `rgba(0, 255, 0, 0)`);
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, size, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.globalAlpha = alpha * 1.5;
+      for (let i = 0; i < 3; i++) {
+        const ringPhase = (field.pulsePhase + i * Math.PI * 0.66) % (Math.PI * 2);
+        const ringSize = size * (0.3 + (ringPhase / (Math.PI * 2)) * 0.7);
+        ctx.strokeStyle = `rgba(57, 255, 20, ${alpha * (1 - ringPhase / (Math.PI * 2))})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, ringSize, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = alpha * 2;
+      ctx.fillStyle = '#39FF14';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.textAlign = 'center';
+      const symbolY = screen.y - size * 0.3 + Math.sin(field.pulsePhase * 2) * 5;
+      ctx.fillText('☢', screen.x, symbolY);
+      ctx.restore();
+    }
+
     for (const cloud of this.poisonClouds) {
       const screen = worldToScreen(cloud.x, cloud.y);
       const alpha = Math.min(0.5, (cloud.life / cloud.maxLife) * 0.6);
@@ -194,6 +320,7 @@ export class HazardManager {
 
   clear() {
     this.poisonClouds = [];
+    this.radiationFields = [];
     this.collapseWarnings = [];
   }
 }

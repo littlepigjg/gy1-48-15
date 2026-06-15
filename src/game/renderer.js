@@ -1,4 +1,4 @@
-import { TILE_SIZE, WORLD_WIDTH, WORLD_HEIGHT, SURFACE_Y, TILE_TYPES, TILE_COLORS, TILE_HARDNESS } from './constants.js';
+import { TILE_SIZE, WORLD_WIDTH, WORLD_HEIGHT, SURFACE_Y, TILE_TYPES, TILE_COLORS, TILE_HARDNESS, ORE_NAMES } from './constants.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -245,7 +245,7 @@ export class Renderer {
     this.ctx.fillStyle = color;
     this.ctx.fillRect(screen.x, screen.y, TILE_SIZE + 1, TILE_SIZE + 1);
 
-    if (tile >= TILE_TYPES.ORE_COAL && tile <= TILE_TYPES.ORE_DIAMOND) {
+    if (tile >= TILE_TYPES.ORE_COAL && tile <= TILE_TYPES.ORE_URANIUM) {
       const baseColors = TILE_COLORS[TILE_TYPES.STONE];
       this.ctx.fillStyle = baseColors[(x * 3 + y * 5) % 3];
       this.ctx.fillRect(screen.x, screen.y, TILE_SIZE + 1, TILE_SIZE + 1);
@@ -260,6 +260,36 @@ export class Renderer {
         this.ctx.fillStyle = colors[2];
         this.ctx.fillRect(screen.x + ox + 1, screen.y + oy + 1, size - 3, size - 3);
         this.ctx.fillStyle = colors[0];
+      }
+
+      if (tile === TILE_TYPES.ORE_URANIUM) {
+        const time = Date.now() * 0.003;
+        const pulse = 0.5 + Math.sin(time + x * 0.5 + y * 0.3) * 0.3;
+        
+        this.ctx.save();
+        this.ctx.shadowColor = '#39FF14';
+        this.ctx.shadowBlur = 15 * pulse;
+        
+        for (let i = 0; i < 6; i++) {
+          const ox = ((x * 17 + y * 23 + i * 31) % (TILE_SIZE - 12)) + 4;
+          const oy = ((x * 19 + y * 29 + i * 37) % (TILE_SIZE - 12)) + 4;
+          const size = 6 + (i % 3) * 3;
+          
+          const innerPulse = 0.6 + Math.sin(time * 1.5 + i) * 0.4;
+          this.ctx.globalAlpha = 0.6 * innerPulse * pulse;
+          this.ctx.fillStyle = '#39FF14';
+          this.ctx.fillRect(screen.x + ox - 1, screen.y + oy - 1, size + 2, size + 2);
+        }
+        
+        this.ctx.restore();
+
+        this.ctx.save();
+        this.ctx.globalAlpha = 0.3 + Math.sin(time * 2) * 0.2;
+        this.ctx.fillStyle = '#39FF14';
+        this.ctx.font = 'bold 14px sans-serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('☢', screen.x + TILE_SIZE / 2, screen.y + TILE_SIZE / 2 + 5);
+        this.ctx.restore();
       }
     }
 
@@ -433,6 +463,12 @@ export class Renderer {
         this.ctx.globalAlpha = 0.5;
       }
 
+      if (e.mutated) {
+        this.ctx.save();
+        this.ctx.shadowColor = '#00FF00';
+        this.ctx.shadowBlur = 10 + Math.sin(Date.now() * 0.01) * 5;
+      }
+
       switch (e.type) {
         case 'worm':
           this.ctx.fillStyle = e.color;
@@ -540,6 +576,10 @@ export class Renderer {
           break;
       }
 
+      if (e.mutated) {
+        this.ctx.restore();
+      }
+
       this.ctx.restore();
 
       const barWidth = size * 1.2;
@@ -549,8 +589,17 @@ export class Renderer {
 
       this.ctx.fillStyle = '#333';
       this.ctx.fillRect(barX, barY, barWidth, barHeight);
-      this.ctx.fillStyle = '#E74C3C';
+      this.ctx.fillStyle = e.mutated ? '#00FF00' : '#E74C3C';
       this.ctx.fillRect(barX, barY, barWidth * (e.health / e.maxHealth), barHeight);
+
+      if (e.mutated) {
+        this.ctx.save();
+        this.ctx.fillStyle = '#00FF00';
+        this.ctx.font = 'bold 12px sans-serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('☢', screen.x, screen.y - half - 15);
+        this.ctx.restore();
+      }
     }
   }
 
