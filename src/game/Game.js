@@ -6,6 +6,7 @@ import { Renderer } from './renderer.js';
 import { UIManager } from './ui.js';
 import { ParticleSystem } from './particles.js';
 import { HazardManager } from './hazards.js';
+import { RadiationManager } from './radiation.js';
 import { TeleportSystem } from './teleport.js';
 
 export class Game {
@@ -36,8 +37,10 @@ export class Game {
     this.bullets = [];
     this.particles = new ParticleSystem();
     this.hazards = new HazardManager();
+    this.radiation = new RadiationManager();
     this.teleport = new TeleportSystem();
     this.collapseTimer = 0;
+    this._cargoLeakWarnCooldown = 0;
 
     this.baseBuildingX = Math.floor(WORLD_WIDTH / 2) - 3;
 
@@ -70,9 +73,11 @@ export class Game {
     this.bullets = [];
     this.particles.clear();
     this.hazards.clear();
+    this.radiation.clear();
     this.teleport = new TeleportSystem();
     this.stats = { blocksDug: 0, enemiesKilled: 0 };
     this.collapseTimer = 0;
+    this._cargoLeakWarnCooldown = 0;
   }
 
   setupInput() {
@@ -213,7 +218,8 @@ export class Game {
       this.particles,
       this.baseBuildingX,
       this.hazards,
-      this.teleport
+      this.teleport,
+      this.radiation
     );
 
     this.ui.updateHUD();
@@ -248,7 +254,10 @@ export class Game {
         if (Math.random() < 0.2) {
           this.particles.spawnTrail(this.player.x, this.player.y, '#7CFC00');
         }
-      } else if (type === 'radiation') {
+      }
+    });
+    this.radiation.update(dt, this.player, (type, damage) => {
+      if (type === 'radiation') {
         this.player.takeRadiationDamage(damage);
         if (Math.random() < 0.3) {
           this.particles.spawnTrail(this.player.x, this.player.y, '#39FF14');
@@ -263,13 +272,22 @@ export class Game {
   }
 
   checkCargoRadiation(dt) {
-    if (this.player.cargo.uranium > 0 && this.player.leadShieldingLevel === 0) {
-      const radiationDamage = 0.5 * dt * 60;
-      this.player.takeRadiationDamage(radiationDamage * 0.1);
-      
-      if (this.player.contaminationLevel > 0.5 && Math.random() < 0.01) {
-        this.ui.showWarning('☢️ 货仓辐射泄漏！正在伤害你', 1500, 'text-green-400');
-      }
+    const damage = this.radiation.applyCargoRadiation(dt, this.player);
+    if (damage > 0 && Math.random() < 0.3) {
+      this.particles.spawnTrail(this.player.x, this.player.y, '#39FF14');
+    }
+
+    if (this._cargoLeakWarnCooldown > 0) {
+      this._cargoLeakWarnCooldown -= dt;
+    }
+
+    if (
+      this.radiation.shouldWarnLeak(this.player.contaminationLevel) &&
+      this._cargoLeakWarnCooldown <= 0
+    ) {
+      const pct = Math.floor(this.player.contaminationLevel * 100);
+      this.ui.showWarning(`☢️ 货仓辐射泄漏！污染 ${pct}%，伤害加重中`, 2000, 'text-green-400');
+      this._cargoLeakWarnCooldown = 8;
     }
   }
 
@@ -338,7 +356,7 @@ export class Game {
         }
 
         if (result.hazard === 'radiation') {
-          this.hazards.spawnRadiationField(
+          this.radiation.spawnField(
             target.x * TILE_SIZE + TILE_SIZE / 2,
             target.y * TILE_SIZE + TILE_SIZE / 2
           );

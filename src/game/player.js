@@ -1,4 +1,5 @@
 import { TILE_SIZE, WORLD_WIDTH, SURFACE_Y, UPGRADE_DEFS, TILE_TYPES, RADIATION } from './constants.js';
+import { ContaminationCalculator } from './radiation.js';
 
 export class Player {
   constructor(startX, startY) {
@@ -117,16 +118,9 @@ export class Player {
   addOre(oreType) {
     if (this.cargoUsed >= this.maxCargo) return false;
     
-    if (oreType === 'uranium' && this.leadShieldingLevel === 0) {
-      const totalOtherOres = this.cargoUsed - this.cargo.uranium;
-      if (totalOtherOres > 0) {
-        this.contaminationLevel = Math.min(1, this.contaminationLevel + RADIATION.CARGO_CONTAMINATION_RATE);
-      }
-    }
-    
-    if (oreType !== 'uranium' && this.cargo.uranium > 0 && this.leadShieldingLevel === 0) {
-      this.contaminationLevel = Math.min(1, this.contaminationLevel + RADIATION.CARGO_CONTAMINATION_RATE);
-    }
+    this.contaminationLevel = ContaminationCalculator.addContamination(
+      this.contaminationLevel, oreType, this.cargo, this.leadShieldingLevel
+    );
     
     this.cargo[oreType]++;
     this.cargoUsed++;
@@ -134,9 +128,9 @@ export class Player {
   }
 
   getContaminatedOreValue(baseValue) {
-    if (this.leadShieldingLevel > 0) return baseValue;
-    const contaminationFactor = 1 - this.contaminationLevel * 0.5;
-    return Math.floor(baseValue * contaminationFactor);
+    return ContaminationCalculator.calcOreValuePenalty(
+      baseValue, this.contaminationLevel, this.leadShieldingLevel
+    );
   }
 
   clearContamination() {

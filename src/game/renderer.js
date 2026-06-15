@@ -42,7 +42,7 @@ export class Renderer {
     return { x: sx, y: sy };
   }
 
-  render(dt, world, player, enemies, bullets, particles, baseBuildingX, hazards = null, teleportSystem = null) {
+  render(dt, world, player, enemies, bullets, particles, baseBuildingX, hazards = null, teleportSystem = null, radiationManager = null) {
     if (this.shakeTime > 0) {
       this.shakeTime -= dt;
       if (this.shakeTime <= 0) this.shakeStrength = 0;
@@ -56,6 +56,9 @@ export class Renderer {
     this.renderWorld(world);
     if (hazards) {
       hazards.render(this.ctx, (x, y) => this.worldToScreen(x, y));
+    }
+    if (radiationManager) {
+      radiationManager.render(this.ctx, (x, y) => this.worldToScreen(x, y));
     }
     particles.render(this.ctx, (x, y) => this.worldToScreen(x, y));
     this.renderBullets(bullets);
